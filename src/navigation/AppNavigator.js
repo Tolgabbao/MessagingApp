@@ -1,0 +1,27 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import LoginScreen from '../screens/Auth/LoginScreen';
+import RegisterScreen from '../screens/Auth/RegisterScreen';
+import HomeScreen from '../screens/HomeScreen';
+import FriendsListScreen from '../screens/Friends/FriendListScreen';
+import AddFriendScreen from '../screens/Friends/AddFriendScreen';
+import ChatScreen from '../screens/Friends/ChatScreen';
+
+const Stack = createNativeStackNavigator();
+
+export default function AppNavigator() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="FriendsList" component={FriendsListScreen} />
+        <Stack.Screen name="AddFriend" component={AddFriendScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
