@@ -3,7 +3,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const instance = axios.create({
-  baseURL: 'http://YOUR_SERVER_URL', // Replace with your backend endpoint base URL
+  baseURL: 'http://192.168.0.241:8080', // Replace with your backend endpoint base URL
 });
 
 instance.interceptors.request.use(async (config) => {
@@ -13,5 +13,11 @@ instance.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+export const acceptFriendRequest = async (email) => {
+  const res = await instance.post('/friends/accept', { email });
+  return res.data;
+};
+
 
 export default instance;
