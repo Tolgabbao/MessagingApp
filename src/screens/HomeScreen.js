@@ -8,6 +8,7 @@ export default function HomeScreen({ navigation }) {
     <View style={styles.container}>
       <Button title="Friends List" onPress={() => navigation.navigate('FriendsList')} />
       <Button title="Add Friend" onPress={() => navigation.navigate('AddFriend')} />
+      <Button title="Friend Requests" onPress={() => navigation.navigate('PendingRequests')} />
       <Button title="Groups" onPress={() => navigation.navigate('GroupList')} />
       <Button title="Logout" onPress={async () => { await logout(); navigation.replace('Login'); }} />
     </View>

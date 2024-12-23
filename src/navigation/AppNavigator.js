@@ -12,6 +12,7 @@ import GroupListScreen from '../screens/Groups/GroupListScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
 import GroupChatScreen from '../screens/Groups/GroupChatScreen';
+import PendingFriendRequestsScreen from '../screens/Friends/PendingFriendRequestsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,7 @@ export default function AppNavigator() {
         <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
         <Stack.Screen name="GroupChat" component={GroupChatScreen} />
+        <Stack.Screen name="PendingRequests" component={PendingFriendRequestsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
