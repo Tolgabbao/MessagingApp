@@ -7,15 +7,20 @@ import api from '../../services/api';
 
 export default function PendingFriendRequestsScreen({ navigation }) {
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadPendingRequests = async () => {
+  const loadAllRequests = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/friends/pending');
-      setPendingRequests(response.data);
+      const [receivedRes, sentRes] = await Promise.all([
+        api.get('/friends/pending'),
+        api.get('/friends/sent')
+      ]);
+      setPendingRequests(receivedRes.data);
+      setSentRequests(sentRes.data);
     } catch (err) {
       setError(err.message || 'Failed to load requests');
       console.error('Error loading requests:', err);
@@ -37,7 +42,7 @@ export default function PendingFriendRequestsScreen({ navigation }) {
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadPendingRequests);
+    const unsubscribe = navigation.addListener('focus', loadAllRequests);
     return unsubscribe;
   }, [navigation]);
 
@@ -57,13 +62,46 @@ export default function PendingFriendRequestsScreen({ navigation }) {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadPendingRequests}>
+          <TouchableOpacity style={styles.retryButton} onPress={loadAllRequests}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       </BackgroundLayout>
     );
   }
+
+  const renderRequestItem = ({ item, isSent }) => (
+    <View style={styles.requestItem}>
+      <View style={styles.userInfo}>
+        <View style={[styles.avatarContainer, isSent && styles.avatarContainerSent]}>
+          <Text style={styles.avatarText}>
+            {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
+          </Text>
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.nameText}>
+            {`${item.firstName} ${item.lastName}`}
+          </Text>
+          <Text style={styles.emailText}>{item.email}</Text>
+        </View>
+      </View>
+      {!isSent && (
+        <TouchableOpacity 
+          style={styles.acceptButton}
+          onPress={() => handleAcceptRequest(item.email)}
+        >
+          <Ionicons name="checkmark" size={24} color={colors.white} />
+          <Text style={styles.acceptButtonText}>Accept</Text>
+        </TouchableOpacity>
+      )}
+      {isSent && (
+        <View style={styles.sentBadge}>
+          <Ionicons name="time" size={16} color={colors.mediumGray} />
+          <Text style={styles.sentText}>Sent</Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <BackgroundLayout>
@@ -73,39 +111,16 @@ export default function PendingFriendRequestsScreen({ navigation }) {
         </View>
 
         <FlatList
-          data={pendingRequests}
-          keyExtractor={(item) => item.userId}
+          data={[...pendingRequests, ...sentRequests.map(req => ({ ...req, isSent: true }))]}
+          keyExtractor={(item) => `${item.userId}-${item.isSent ? 'sent' : 'received'}`}
           contentContainerStyle={styles.listContainer}
-          renderItem={({ item }) => (
-            <View style={styles.requestItem}>
-              <View style={styles.userInfo}>
-                <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>
-                    {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
-                  </Text>
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.nameText}>
-                    {`${item.firstName} ${item.lastName}`}
-                  </Text>
-                  <Text style={styles.emailText}>{item.email}</Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.acceptButton}
-                onPress={() => handleAcceptRequest(item.email)}
-              >
-                <Ionicons name="checkmark" size={24} color={colors.white} />
-                <Text style={styles.acceptButtonText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          renderItem={({ item }) => renderRequestItem({ item, isSent: item.isSent })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="mail-open" size={48} color={colors.mediumGray} />
-              <Text style={styles.emptyText}>No pending friend requests</Text>
+              <Text style={styles.emptyText}>No pending requests</Text>
               <Text style={styles.emptySubText}>
-                When someone adds you, their request will appear here
+                Friend requests you send or receive will appear here
               </Text>
             </View>
           }
@@ -237,5 +252,20 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  avatarContainerSent: {
+    backgroundColor: colors.mediumGray,
+  },
+  sentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: colors.lightGray,
+    borderRadius: 16,
+  },
+  sentText: {
+    ...typography.caption,
+    color: colors.darkGray,
+    marginLeft: 4,
   },
 });

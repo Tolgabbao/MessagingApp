@@ -90,9 +90,6 @@ export default function GroupListScreen({ navigation }) {
               </View>
               <View style={styles.groupInfo}>
                 <Text style={styles.groupName}>{item.groupName}</Text>
-                <Text style={styles.memberCount}>
-                  {item.memberCount || 'No'} members
-                </Text>
               </View>
               <Ionicons 
                 name="chevron-forward" 
