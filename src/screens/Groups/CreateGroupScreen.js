@@ -73,6 +73,12 @@ export default function CreateGroupScreen({ navigation }) {
     <BackgroundLayout>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
           <Text style={styles.headerText}>Create New Group</Text>
         </View>
 
@@ -177,12 +183,17 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.primary,
-    padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+  },
+  backButton: {
+    marginRight: 16,
   },
   headerText: {
     ...typography.header,
     color: colors.white,
+    flex: 1,
   },
   formContainer: {
     padding: 16,

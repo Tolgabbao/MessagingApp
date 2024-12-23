@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Button, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { colors, typography, layouts } from '../../theme';
 import BackgroundLayout from '../../components/BackgroundLayout';
@@ -67,7 +68,13 @@ export default function GroupDetailScreen({ route, navigation }) {
     <BackgroundLayout>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.groupName}>{groupInfo.group.groupName}</Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerText}>{groupInfo?.group.groupName}</Text>
         </View>
         
         <View style={styles.infoSection}>
@@ -124,13 +131,19 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.mediumGray,
   },
-  groupName: {
+  backButton: {
+    marginRight: 16,
+  },
+  headerText: {
     ...typography.header,
     color: colors.white,
+    flex: 1,
   },
   infoSection: {
     padding: 16,

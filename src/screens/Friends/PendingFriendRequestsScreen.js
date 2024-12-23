@@ -107,6 +107,12 @@ export default function PendingFriendRequestsScreen({ navigation }) {
     <BackgroundLayout>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
           <Text style={styles.headerText}>Friend Requests</Text>
         </View>
 
@@ -142,11 +148,14 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
   },
   headerText: {
     ...typography.header,
     color: colors.white,
+    flex: 1,
   },
   listContainer: {
     padding: 16,
@@ -267,5 +276,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.darkGray,
     marginLeft: 4,
+  },
+  backButton: {
+    marginRight: 16,
   },
 });

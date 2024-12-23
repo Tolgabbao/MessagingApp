@@ -64,6 +64,12 @@ export default function GroupListScreen({ navigation }) {
     <BackgroundLayout>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
           <Text style={styles.headerText}>My Groups</Text>
           <TouchableOpacity 
             style={styles.createButton}
@@ -227,5 +233,8 @@ const styles = StyleSheet.create({
     color: colors.mediumGray,
     textAlign: 'center',
     marginTop: 8,
+  },
+  backButton: {
+    marginRight: 16,
   },
 });

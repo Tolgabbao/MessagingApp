@@ -57,13 +57,18 @@ export default function FriendsListScreen({ navigation }) {
     <BackgroundLayout>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
           <Text style={styles.headerText}>My Friends</Text>
           <TouchableOpacity 
             style={styles.addButton}
             onPress={() => navigation.navigate('AddFriend')}
           >
             <Ionicons name="person-add" size={24} color={colors.white} />
-            <Text style={styles.addButtonText}>Add Friend</Text>
           </TouchableOpacity>
         </View>
 
@@ -223,5 +228,8 @@ const styles = StyleSheet.create({
     color: colors.mediumGray,
     textAlign: 'center',
     marginTop: 8,
+  },
+  backButton: {
+    padding: 8,
   },
 });
