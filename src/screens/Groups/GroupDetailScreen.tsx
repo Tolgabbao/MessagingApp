@@ -1,60 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { RouteProp } from '@react-navigation/native';
 import api from '../../services/api';
 import { colors, typography, layouts } from '../../theme';
 import BackgroundLayout from '../../components/BackgroundLayout';
+import { NavigationProps, GroupDetails, ApiResponse, RootStackParamList } from '../../types/global';
 
-export default function GroupDetailScreen({ route, navigation }) {
-  const { groupId } = route.params;
-  const [groupInfo, setGroupInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+interface GroupDetailScreenProps extends NavigationProps {
+  route: RouteProp<RootStackParamList, 'GroupDetail'>;
+}
 
-  const loadGroupDetails = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Use the endpoint structure matching the GroupController
-      const groupRes = await api.get(`/groups/details/${groupId}`);
-      console.log('Group details:', groupRes.data);
-      setGroupInfo(groupRes.data);
-    } catch (err) {
-      setError(err.message || 'Failed to load group details');
-      console.error('Error loading group:', err);
-    } finally {
-      setLoading(false);
-    }
+const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({ route, navigation }) => {
+  const { groupDetails } = route.params;
+
+  console.log('GroupDetail params:', route.params);
+
+  const handleOpenChat = () => {
+    navigation.navigate('GroupChat', {
+      groupId: groupDetails.group.groupId,
+      groupName: groupDetails.group.groupName,
+      groupDetails: groupDetails
+    });
   };
 
-  useEffect(() => {
-    loadGroupDetails();
-  }, [groupId]);
-
-  if (loading) {
-    return (
-      <BackgroundLayout>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.secondary} />
-        </View>
-      </BackgroundLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <BackgroundLayout>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadGroupDetails}>
-            <Text style={styles.buttonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </BackgroundLayout>
-    );
-  }
-
-  if (!groupInfo) {
+  if (!groupDetails) {
     return (
       <BackgroundLayout>
         <View style={styles.centerContainer}>
@@ -74,25 +44,22 @@ export default function GroupDetailScreen({ route, navigation }) {
           >
             <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
-          <Text style={styles.headerText}>{groupInfo?.group.groupName}</Text>
+          <Text style={styles.headerText}>{groupDetails.group.groupName}</Text>
         </View>
         
         <View style={styles.infoSection}>
           <Text style={styles.infoText}>
-            Created: {new Date(groupInfo.group.createdAt).toLocaleString()}
+            Created: {new Date(groupDetails.group.createdAt).toLocaleDateString()}
           </Text>
-          <Text style={styles.infoText}>
-            Last Updated: {new Date(groupInfo.group.updatedAt).toLocaleString()}
-          </Text>
-          <Text style={styles.adminText}>Admin: {groupInfo.adminName}</Text>
+          <Text style={styles.adminText}>Admin: {groupDetails.adminName}</Text>
         </View>
         
         <Text style={styles.membersHeader}>
-          Members ({groupInfo.members.length}):
+          Members ({groupDetails.members.length}):
         </Text>
         
         <FlatList 
-          data={groupInfo.members}
+          data={groupDetails.members}
           keyExtractor={(item) => item.userId}
           renderItem={({item}) => (
             <View style={styles.memberItem}>
@@ -106,13 +73,10 @@ export default function GroupDetailScreen({ route, navigation }) {
         
         <TouchableOpacity 
           style={styles.chatButton}
-          onPress={() => navigation.navigate('GroupChat', { 
-            groupId: groupInfo.group.groupId, 
-            groupName: groupInfo.group.groupName,
-            groupDetails: groupInfo // Pass the entire groupInfo
-          })}
+          onPress={handleOpenChat}
         >
-          <Text style={styles.buttonText}>Open Chat</Text>
+          <Ionicons name="chatbubbles" size={24} color={colors.white} />
+          <Text style={styles.buttonText}>Open Group Chat</Text>
         </TouchableOpacity>
       </View>
     </BackgroundLayout>
@@ -211,3 +175,6 @@ const styles = StyleSheet.create({
     color: colors.mediumGray,
   },
 });
+
+
+export default GroupDetailScreen;

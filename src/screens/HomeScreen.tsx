@@ -1,37 +1,44 @@
-// src/screens/HomeScreen.js
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { colors, typography, layouts } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../components/BackgroundLayout';
 import { logout } from '../services/auth';
+import { NavigationProps } from '../types/global';
 
-export default function HomeScreen({ navigation }) {
-  const menuItems = [
+interface MenuItem {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  color: string;
+}
+
+const HomeScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const menuItems: MenuItem[] = [
     {
-      title: "Friends List",
-      icon: "people",
-      onPress: () => navigation.navigate('FriendsList'),
-      color: colors.secondary
-    },
-    {
-      title: "Add Friend",
-      icon: "person-add",
-      onPress: () => navigation.navigate('AddFriend'),
-      color: colors.accent
-    },
-    {
-      title: "Friend Requests",
-      icon: "mail-unread",
-      onPress: () => navigation.navigate('PendingRequests'),
-      color: colors.attention
-    },
-    {
-      title: "Groups",
-      icon: "chatbubbles",
-      onPress: () => navigation.navigate('GroupList'),
-      color: colors.highlight
-    }
+          title: "Friends List",
+          icon: "people",
+          onPress: () => navigation.navigate('FriendsList'),
+          color: colors.secondary
+        },
+        {
+          title: "Add Friend",
+          icon: "person-add",
+          onPress: () => navigation.navigate('AddFriend'),
+          color: colors.accent
+        },
+        {
+          title: "Friend Requests",
+          icon: "mail-unread",
+          onPress: () => navigation.navigate('PendingRequests'),
+          color: colors.attention
+        },
+        {
+          title: "Groups",
+          icon: "chatbubbles",
+          onPress: () => navigation.navigate('GroupList'),
+          color: colors.highlight
+        }
   ];
 
   return (
@@ -97,6 +104,7 @@ const styles = StyleSheet.create({
     ...typography.header,
     color: colors.white,
     fontSize: 24,
+    fontWeight: 'bold',
   },
   logoutButton: {
     padding: 8,
@@ -148,3 +156,6 @@ const styles = StyleSheet.create({
     color: colors.darkGray,
   },
 });
+
+
+export default HomeScreen;

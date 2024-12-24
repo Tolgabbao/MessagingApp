@@ -1,38 +1,83 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Modal } from 'react-native';
-import { GiftedChat, Bubble, InputToolbar, Composer, Send } from 'react-native-gifted-chat';
+import { View, StyleSheet, Text, TouchableOpacity, Modal } from 'react-native';
+import { GiftedChat, Bubble, InputToolbar, Composer, Send, IMessage } from 'react-native-gifted-chat';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, typography, layouts } from '../../theme';
+import { colors, typography } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import api from '../../services/api';
+import { NavigationProps, Message, GroupDetails, ApiResponse } from '../../types/global';
+import { RouteProp } from '@react-navigation/native';
 
-export default function GroupChatScreen({ route, navigation }) {
+
+export type RootStackParamList = {
+
+    GroupChat: {
+  
+      groupId: string;
+  
+      groupName: string;
+  
+      groupDetails: GroupDetails;
+  
+    };
+  
+    // ... other screen params
+  
+  };
+
+interface GroupChatScreenProps extends NavigationProps {
+    route: RouteProp<RootStackParamList, 'GroupChat'>;
+  }
+  
+
+interface SelectedUser {
+  name: string;
+  id: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+interface MessageInput extends Message {
+  senderName?: string;
+}
+
+const GroupChatScreen: React.FC<GroupChatScreenProps> = ({ route, navigation }) => {
   const { groupId, groupName, groupDetails } = route.params;
-  const [messages, setMessages] = useState([]);
-  const [userId, setUserId] = useState(null);
-  const [userDetailsVisible, setUserDetailsVisible] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userDetailsVisible, setUserDetailsVisible] = useState<boolean>(false);
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
 
-  const generateTempId = () => {
+  useEffect(() => {
+    // Debug log to verify params
+    console.log('GroupChat params:', {
+      groupId,
+      groupName,
+      groupDetails
+    });
+  }, []);
+
+  const generateTempId = (): string => {
     return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
 
-  const getUserId = async () => {
+  const getUserId = async (): Promise<void> => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUserId(payload.sub);
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserId(payload.sub);
+      }
     } catch (err) {
       console.error('Error getting user ID:', err);
     }
   };
 
-  const formatMessage = (msg) => {
+  const formatMessage = (msg: MessageInput): IMessage => {
     const isSelfMessage = msg.senderId === userId;
     const messageId = msg.id ? msg.id.toString() : generateTempId();
     
-    // Find the member from groupDetails to get their name
     const member = groupDetails.members.find(m => m.userId === msg.senderId);
     const senderName = member 
       ? `${member.firstName} ${member.lastName}`
@@ -41,47 +86,64 @@ export default function GroupChatScreen({ route, navigation }) {
     return {
       _id: messageId,
       text: msg.content || '',
-      createdAt: msg.timestamp?.$numberLong 
-        ? new Date(parseInt(msg.timestamp.$numberLong))
-        : msg.timestamp 
-          ? new Date(msg.timestamp) 
-          : new Date(),
+      createdAt: msg.timestamp 
+        ? typeof msg.timestamp === 'object' && '$numberLong' in msg.timestamp
+          ? new Date(parseInt(msg.timestamp.$numberLong!))
+          : new Date(msg.timestamp)
+        : new Date(),
       user: {
-        _id: isSelfMessage ? userId : msg.senderId,
+        _id: isSelfMessage ? userId! : msg.senderId,
         name: isSelfMessage ? 'You' : senderName
       }
     };
   };
 
-  const loadMessages = async () => {
+  const loadMessages = async (): Promise<void> => {
+    if (!groupId) {
+      console.error('No groupId provided');
+      return;
+    }
+
     try {
-      const res = await api.get(`/groups/${groupId}/messages`);
-      const formatted = res.data.map(formatMessage);
+      const res = await api.get<ApiResponse<Message[]>>(`/groups/${groupId}/messages`);
+      console.log('Group messages request:', `/groups/${groupId}/messages`);
+      console.log('Group messages response:', JSON.stringify(res.data, null, 2));
+
+      if (!res.data?.data) {
+        console.error('Invalid group messages response:', res.data);
+        return;
+      }
+
+      const formatted = res.data.data.map(formatMessage);
       setMessages(formatted.reverse());
-    } catch (err) {
-      console.error('Error loading group messages:', err);
-      alert('Error loading messages: ' + (err.message || 'Unknown error'));
+    } catch (err: any) {
+      console.error('Error loading group messages:', {
+        error: err,
+        response: err.response?.data,
+        groupId
+      });
     }
   };
 
-  const handleSend = async (newMessages = []) => {
-    if (!newMessages.length) return;
+  const handleSend = async (newMessages: IMessage[] = []): Promise<void> => {
+    if (!newMessages.length || !userId) return;
     
     const m = newMessages[0];
     try {
-      const res = await api.post(`/groups/${groupId}/send`, {
+      const res = await api.post<ApiResponse<Message>>(`/groups/${groupId}/send`, {
         content: m.text,
-        recipientId: groupId  // Add the required recipientId field
+        recipientId: groupId
       });
 
-      setMessages(GiftedChat.append(messages, formatMessage({
-        ...res.data,
-        senderId: userId,
-        id: generateTempId()
-      })));
-    } catch (err) {
+      setMessages(prevMessages => 
+        GiftedChat.append(prevMessages, [formatMessage({
+          ...res.data.data,
+          senderId: userId,
+          id: generateTempId()
+        })])
+      );
+    } catch (err: any) {
       console.error('Error sending message:', err);
-      alert('Error sending message: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -90,14 +152,20 @@ export default function GroupChatScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && groupId) {
+      // Initial load
       loadMessages();
+      
+      // Set up polling every 3 seconds
+      const pollInterval = setInterval(loadMessages, 3000);
+      
+      // Cleanup on unmount
+      return () => clearInterval(pollInterval);
     }
-  }, [userId]);
+  }, [userId, groupId]);
 
-  const handleBubblePress = (context, message) => {
+  const handleBubblePress = (context: any, message: IMessage): void => {
     if (message.user._id !== userId) {
-      // Find member from the existing group details
       const member = groupDetails.members.find(m => m.userId === message.user._id);
       if (member) {
         setSelectedUser({
@@ -111,7 +179,7 @@ export default function GroupChatScreen({ route, navigation }) {
     }
   };
 
-  const renderBubble = props => (
+  const renderBubble = (props: any) => (
     <Bubble
       {...props}
       wrapperStyle={{
@@ -126,42 +194,37 @@ export default function GroupChatScreen({ route, navigation }) {
     />
   );
 
-  const renderInputToolbar = (props) => {
-    return (
-      <InputToolbar
-        {...props}
-        containerStyle={styles.inputToolbar}
-        primaryStyle={styles.inputToolbarPrimary}
-      />
-    );
-  };
+  const renderInputToolbar = (props: any) => (
+    <InputToolbar
+      {...props}
+      containerStyle={styles.inputToolbar}
+      primaryStyle={styles.inputToolbarPrimary}
+    />
+  );
 
-  const renderComposer = (props) => {
-    return (
-      <Composer
-        {...props}
-        textInputStyle={styles.composer}
-        placeholderTextColor={colors['heasy-gray']}
-      />
-    );
-  };
+  const renderComposer = (props: any) => (
+    <Composer
+      {...props}
+      textInputStyle={styles.composer}
+      placeholderTextColor={colors.mediumGray}
+      multiline={true}
+    />
+  );
 
-  const renderSend = (props) => {
-    return (
-      <Send
-        {...props}
-        containerStyle={styles.sendContainer}
-        disabled={!props.text}
-      >
-        <View style={[
-          styles.sendButton,
-          !props.text && styles.sendButtonDisabled
-        ]}>
-          <Ionicons name="send" size={16} color={colors.white} />
-        </View>
-      </Send>
-    );
-  };
+  const renderSend = (props: any) => (
+    <Send
+      {...props}
+      containerStyle={styles.sendContainer}
+      disabled={!props.text}
+    >
+      <View style={[
+        styles.sendButton,
+        !props.text && styles.sendButtonDisabled
+      ]}>
+        <Ionicons name="send" size={16} color={colors.white} />
+      </View>
+    </Send>
+  );
 
   return (
     <BackgroundLayout>
@@ -179,7 +242,7 @@ export default function GroupChatScreen({ route, navigation }) {
         <View style={styles.chatContainer}>
           <GiftedChat
             messages={messages}
-            onSend={messages => handleSend(messages)}
+            onSend={handleSend}
             user={{ _id: userId || 'temp' }}
             renderBubble={renderBubble}
             renderInputToolbar={renderInputToolbar}
@@ -231,7 +294,7 @@ export default function GroupChatScreen({ route, navigation }) {
       </View>
     </BackgroundLayout>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -315,11 +378,6 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: colors.mediumGray,
   },
-  adminBadge: {
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: 'normal',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -396,3 +454,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+export default GroupChatScreen;

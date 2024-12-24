@@ -1,31 +1,59 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { 
+  ActivityIndicator, 
+  FlatList, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet 
+} from 'react-native';
 import { colors, typography, layouts } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import api from '../../services/api';
+import { NavigationProps, Group, ApiResponse, GroupDetails } from '../../types/global';
 
-export default function FriendsListScreen({ navigation }) {
-  const [friends, setFriends] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const GroupListScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadFriends = async () => {
+  const loadGroups = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/friends');
-      setFriends(res.data);
-    } catch (err) {
-      setError(err.message || 'Failed to load friends');
-      console.error('Error loading friends:', err);
+      const res = await api.get<ApiResponse<Group[]>>('/groups');
+      console.log('Groups response:', JSON.stringify(res.data, null, 2)); // Debug log
+      setGroups(res.data.data || []);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load groups');
+      console.error('Error loading groups:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGroupPress = async (group: Group) => {
+    try {
+      const res = await api.get<ApiResponse<GroupDetails>>(`/groups/details/${group.groupId}`);
+      console.log('Group details response:', JSON.stringify(res.data, null, 2));
+
+      if (!res.data?.data) {
+        throw new Error('No group details received');
+      }
+
+      // Navigate to GroupDetail with correct data structure
+      navigation.navigate('GroupDetail', {
+        groupId: group.groupId,
+        groupDetails: res.data.data
+      });
+    } catch (err) {
+      console.error('Error fetching group details:', err);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadFriends);
+    const unsubscribe = navigation.addListener('focus', loadGroups);
     return unsubscribe;
   }, [navigation]);
 
@@ -45,7 +73,7 @@ export default function FriendsListScreen({ navigation }) {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadFriends}>
+          <TouchableOpacity style={styles.retryButton} onPress={loadGroups}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -63,48 +91,46 @@ export default function FriendsListScreen({ navigation }) {
           >
             <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
-          <Text style={styles.headerText}>My Friends</Text>
+          <Text style={styles.headerText}>My Groups</Text>
           <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => navigation.navigate('AddFriend')}
+            style={styles.createButton}
+            onPress={() => navigation.navigate('CreateGroup')}
           >
-            <Ionicons name="person-add" size={24} color={colors.white} />
+            <Ionicons name="add-circle" size={24} color={colors.white} />
+            <Text style={styles.createButtonText}>New Group</Text>
           </TouchableOpacity>
         </View>
 
         <FlatList
-          data={friends}
-          keyExtractor={(item) => item.userId}
+          data={groups}
+          keyExtractor={(item: Group) => item.groupId}
           contentContainerStyle={styles.listContainer}
-          renderItem={({ item }) => (
+          renderItem={({item}) => (
             <TouchableOpacity 
-              style={styles.friendItem}
-              onPress={() => navigation.navigate('Chat', { 
-                friendId: item.userId, 
-                friendName: `${item.firstName} ${item.lastName}`,
-                friendEmail: item.email // Add this line
-              })}
+              style={styles.groupItem}
+              onPress={() => handleGroupPress(item)}
             >
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>
-                  {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
+              <View style={styles.groupIcon}>
+                <Text style={styles.groupInitial}>
+                  {item.groupName.charAt(0).toUpperCase()}
                 </Text>
               </View>
-              <View style={styles.friendInfo}>
-                <Text style={styles.friendName}>
-                  {item.firstName} {item.lastName}
-                </Text>
-                <Text style={styles.friendEmail}>{item.email}</Text>
+              <View style={styles.groupInfo}>
+                <Text style={styles.groupName}>{item.groupName}</Text>
               </View>
-              <Ionicons name="chatbubble-outline" size={24} color={colors.secondary} />
+              <Ionicons 
+                name="chevron-forward" 
+                size={24} 
+                color={colors.darkGray} 
+              />
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="people" size={48} color={colors.mediumGray} />
-              <Text style={styles.emptyText}>No friends yet</Text>
+              <Text style={styles.emptyText}>No groups yet</Text>
               <Text style={styles.emptySubText}>
-                Add friends to start chatting
+                Create a group to start chatting with your friends
               </Text>
             </View>
           }
@@ -112,7 +138,7 @@ export default function FriendsListScreen({ navigation }) {
       </View>
     </BackgroundLayout>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -135,14 +161,14 @@ const styles = StyleSheet.create({
     ...typography.header,
     color: colors.white,
   },
-  addButton: {
+  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.secondary,
     padding: 8,
     borderRadius: 20,
   },
-  addButtonText: {
+  createButtonText: {
     color: colors.white,
     marginLeft: 4,
     fontWeight: '600',
@@ -150,7 +176,7 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
   },
-  friendItem: {
+  groupItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
@@ -163,29 +189,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  avatarContainer: {
+  groupIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: {
+  groupInitial: {
     color: colors.white,
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
   },
-  friendInfo: {
+  groupInfo: {
     flex: 1,
     marginLeft: 12,
   },
-  friendName: {
+  groupName: {
     ...typography.body,
     color: colors.primary,
     fontWeight: 'bold',
   },
-  friendEmail: {
+  memberCount: {
     ...typography.caption,
     color: colors.darkGray,
   },
@@ -230,6 +256,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   backButton: {
-    padding: 8,
+    marginRight: 16,
   },
 });
+
+export default GroupListScreen;

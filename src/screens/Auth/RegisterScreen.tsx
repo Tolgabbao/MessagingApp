@@ -5,15 +5,23 @@ import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import { register } from '../../services/auth';
 import StyledTextInput from '../../components/StyledTextInput';
+import { NavigationProps, Theme, ApiResponse } from '../../types/global';
 
-export default function RegisterScreen({ navigation }) {
-  const [formData, setFormData] = useState({
+interface RegisterFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+const RegisterScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [formData, setFormData] = useState<RegisterFormData>({
     firstName: '',
     lastName: '',
     email: '',
     password: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const handleRegister = async () => {
     if (Object.values(formData).some(value => !value.trim())) return;
@@ -33,7 +41,7 @@ export default function RegisterScreen({ navigation }) {
       );
       navigation.replace('Login');
     } catch (err) {
-      alert('Registration failed: ' + err.message);
+        console.log(err);
     } finally {
       setLoading(false);
     }
@@ -150,6 +158,7 @@ const styles = StyleSheet.create({
     color: colors.white,
     textAlign: 'center',
     flex: 1,
+    fontWeight: 'bold',
   },
   content: {
     padding: 24,
@@ -197,3 +206,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
+export default RegisterScreen;

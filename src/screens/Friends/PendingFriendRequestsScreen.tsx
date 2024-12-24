@@ -1,47 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors, typography, layouts } from '../../theme';
+import { colors, typography } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import api from '../../services/api';
+import { NavigationProps, FriendRequest, ApiResponse } from '../../types/global';
 
-export default function PendingFriendRequestsScreen({ navigation }) {
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [sentRequests, setSentRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const PendingFriendRequestsScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadAllRequests = async () => {
     try {
       setLoading(true);
       setError(null);
+      
       const [receivedRes, sentRes] = await Promise.all([
-        api.get('/friends/pending'),
-        api.get('/friends/sent')
+        api.get<ApiResponse<FriendRequest[]>>('/friends/pending'),
+        api.get<ApiResponse<FriendRequest[]>>('/friends/sent')
       ]);
-      setPendingRequests(receivedRes.data);
-      setSentRequests(sentRes.data);
-    } catch (err) {
-      setError(err.message || 'Failed to load requests');
+
+      console.log('Received requests:', JSON.stringify(receivedRes.data, null, 2));
+      console.log('Sent requests:', JSON.stringify(sentRes.data, null, 2));
+
+      setPendingRequests(receivedRes.data.data || []);
+      setSentRequests((sentRes.data.data || []).map(req => ({ ...req, isSent: true })));
+    } catch (err: any) {
+      setError('Failed to load requests');
       console.error('Error loading requests:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAcceptRequest = async (email) => {
-    try {
-      await api.post('/friends/accept', { email });
-      // Remove the accepted request from the list
-      setPendingRequests(current => 
-        current.filter(request => request.email !== email)
-      );
-    } catch (err) {
-      alert('Error accepting request: ' + err.message);
-    }
-  };
-
   useEffect(() => {
+    loadAllRequests();
     const unsubscribe = navigation.addListener('focus', loadAllRequests);
     return unsubscribe;
   }, [navigation]);
@@ -56,51 +51,50 @@ export default function PendingFriendRequestsScreen({ navigation }) {
     );
   }
 
-  if (error) {
-    return (
-      <BackgroundLayout>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={48} color={colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadAllRequests}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </BackgroundLayout>
-    );
-  }
+  const allRequests = [...pendingRequests, ...sentRequests];
 
-  const renderRequestItem = ({ item, isSent }) => (
+  const handleAcceptRequest = async (email: string): Promise<void> => {
+    try {
+      await api.post('/friends/accept', { email });
+      setPendingRequests(current => 
+        current.filter(request => request.email !== email)
+      );
+    } catch (err: any) {
+      console.log('Error accepting request: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
+  const renderRequestItem = ({ item, isSent }: { item: FriendRequest; isSent?: boolean }) => (
     <View style={styles.requestItem}>
-      <View style={styles.userInfo}>
-        <View style={[styles.avatarContainer, isSent && styles.avatarContainerSent]}>
-          <Text style={styles.avatarText}>
-            {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
-          </Text>
+          <View style={styles.userInfo}>
+            <View style={[styles.avatarContainer, isSent && styles.avatarContainerSent]}>
+              <Text style={styles.avatarText}>
+                {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
+              </Text>
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.nameText}>
+                {`${item.firstName} ${item.lastName}`}
+              </Text>
+              <Text style={styles.emailText}>{item.email}</Text>
+            </View>
+          </View>
+          {!isSent && (
+            <TouchableOpacity 
+              style={styles.acceptButton}
+              onPress={() => handleAcceptRequest(item.email)}
+            >
+              <Ionicons name="checkmark" size={24} color={colors.white} />
+              <Text style={styles.acceptButtonText}>Accept</Text>
+            </TouchableOpacity>
+          )}
+          {isSent && (
+            <View style={styles.sentBadge}>
+              <Ionicons name="time" size={16} color={colors.mediumGray} />
+              <Text style={styles.sentText}>Sent</Text>
+            </View>
+          )}
         </View>
-        <View style={styles.textContainer}>
-          <Text style={styles.nameText}>
-            {`${item.firstName} ${item.lastName}`}
-          </Text>
-          <Text style={styles.emailText}>{item.email}</Text>
-        </View>
-      </View>
-      {!isSent && (
-        <TouchableOpacity 
-          style={styles.acceptButton}
-          onPress={() => handleAcceptRequest(item.email)}
-        >
-          <Ionicons name="checkmark" size={24} color={colors.white} />
-          <Text style={styles.acceptButtonText}>Accept</Text>
-        </TouchableOpacity>
-      )}
-      {isSent && (
-        <View style={styles.sentBadge}>
-          <Ionicons name="time" size={16} color={colors.mediumGray} />
-          <Text style={styles.sentText}>Sent</Text>
-        </View>
-      )}
-    </View>
   );
 
   return (
@@ -117,7 +111,7 @@ export default function PendingFriendRequestsScreen({ navigation }) {
         </View>
 
         <FlatList
-          data={[...pendingRequests, ...sentRequests.map(req => ({ ...req, isSent: true }))]}
+          data={allRequests}
           keyExtractor={(item) => `${item.userId}-${item.isSent ? 'sent' : 'received'}`}
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => renderRequestItem({ item, isSent: item.isSent })}
@@ -156,6 +150,7 @@ const styles = StyleSheet.create({
     ...typography.header,
     color: colors.white,
     flex: 1,
+    fontWeight: '600',
   },
   listContainer: {
     padding: 16,
@@ -281,3 +276,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
 });
+
+
+export default PendingFriendRequestsScreen;

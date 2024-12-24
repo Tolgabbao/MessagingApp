@@ -5,20 +5,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, typography, layouts } from '../../theme';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import { Ionicons } from '@expo/vector-icons';
+import { NavigationProps, User, ApiResponse } from '../../types/global';
 
-export default function CreateGroupScreen({ navigation }) {
-  const [groupName, setGroupName] = useState('');
-  const [friends, setFriends] = useState([]);
-  const [selectedFriends, setSelectedFriends] = useState([]);
-  const [userId, setUserId] = useState(null);
-  const [showFriendSelector, setShowFriendSelector] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+interface Friend {
+  id: string;
+  name: string;
+  email: string;
+}
 
-  const getUserId = async () => {
+interface CreateGroupResponse {
+  groupId: string;
+  name: string;
+}
+
+const CreateGroupScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [groupName, setGroupName] = useState<string>('');
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showFriendSelector, setShowFriendSelector] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const getUserId = async (): Promise<void> => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUserId(payload.sub);
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserId(payload.sub);
+      }
     } catch (err) {
       console.error('Error getting user ID:', err);
     }
@@ -28,31 +42,34 @@ export default function CreateGroupScreen({ navigation }) {
     getUserId();
     const fetchFriends = async () => {
       try {
-        const res = await api.get('/friends');
-        // Map the API response to the required format
-        const formattedFriends = res.data.map(friend => ({
+        const res = await api.get<ApiResponse<User[]>>('/friends');
+        const formattedFriends: Friend[] = res.data.data.map(friend => ({
           id: friend.userId,
           name: `${friend.firstName} ${friend.lastName}`,
           email: friend.email
         }));
         setFriends(formattedFriends);
-      } catch (err) {
-        alert('Error fetching friends: ' + err.message);
+      } catch (err: any) {
+        console.log('Error fetching friends: ' + err?.message);
       }
     };
 
     fetchFriends();
   }, []);
 
-  const handleSelectFriend = (friendId) => {
-    setSelectedFriends((prevSelected) => {
-      if (prevSelected.includes(friendId)) {
-        return prevSelected.filter(id => id !== friendId);
-      } else {
-        return [...prevSelected, friendId];
-      }
+interface FriendSelection {
+    friendId: string;
+}
+
+const handleSelectFriend = ({ friendId }: FriendSelection): void => {
+    setSelectedFriends((prevSelected: string[]): string[] => {
+        if (prevSelected.includes(friendId)) {
+            return prevSelected.filter((id: string): boolean => id !== friendId);
+        } else {
+            return [...prevSelected, friendId];
+        }
     });
-  };
+};
 
   const handleOpenFriendSelector = () => setShowFriendSelector(true);
   const handleCloseFriendSelector = () => setShowFriendSelector(false);
@@ -62,10 +79,10 @@ export default function CreateGroupScreen({ navigation }) {
       // Ensure current user is included
       const memberIds = [...new Set([...selectedFriends, userId])];
       const res = await api.post('/groups/create', { groupName, memberIds });
-      alert('Group created: ' + res.data.name);
+      console.log('Group created: ' + res.data.name);
       navigation.goBack();
-    } catch (err) {
-      alert('Error creating group: ' + err.message);
+    } catch (err: any) {
+      console.log('Error creating group: ' + err?.message);
     }
   };
 
@@ -110,7 +127,7 @@ export default function CreateGroupScreen({ navigation }) {
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.selectedFriendItem}
-                onPress={() => handleSelectFriend(item.id)}
+                onPress={() => handleSelectFriend({ friendId: item.id })}
               >
                 <Text style={styles.friendName}>{item.name}</Text>
                 <Ionicons name="close-circle" size={24} color={colors.accent} />
@@ -152,7 +169,7 @@ export default function CreateGroupScreen({ navigation }) {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.friendItem}
-                  onPress={() => handleSelectFriend(item.id)}
+                  onPress={() => handleSelectFriend({ friendId: item.id })}
                 >
                   <Text style={styles.friendName}>{item.name}</Text>
                   <Text style={styles.friendEmail}>{item.email}</Text>
@@ -309,3 +326,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export default CreateGroupScreen;

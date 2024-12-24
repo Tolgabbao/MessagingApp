@@ -1,26 +1,49 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Modal } from 'react-native';
-import { GiftedChat, Bubble, InputToolbar, Composer, Send } from 'react-native-gifted-chat';
+import { View, StyleSheet, Text, TouchableOpacity, Modal } from 'react-native';
+import { GiftedChat, Bubble, InputToolbar, Composer, Send, IMessage } from 'react-native-gifted-chat';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, typography, layouts } from '../../theme';
+import { colors, typography } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import api from '../../services/api';
+import { NavigationProps, Message, ApiResponse } from '../../types/global';
+import { RouteProp } from '@react-navigation/native';
 
-export default function ChatScreen({ route, navigation }) {
+type RootStackParamList = {
+  Chat: {
+    friendId: string;
+    friendName: string;
+    friendEmail: string;
+  };
+};
+
+interface ChatScreenProps extends NavigationProps {
+  route: RouteProp<RootStackParamList, 'Chat'>;
+}
+
+interface UserDetails {
+  name: string;
+  id: string;
+  email: string;
+}
+
+const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const { friendId, friendName } = route.params;
-  const [messages, setMessages] = useState([]);
-  const [userId, setUserId] = useState(null);
-  const [userDetailsVisible, setUserDetailsVisible] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userDetailsVisible, setUserDetailsVisible] = useState<boolean>(false);
+  const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
 
-  const generateTempId = () => {
+  const generateTempId = (): string => {
     return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
 
   const getUserId = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token not found');
+      }
       const payload = JSON.parse(atob(token.split('.')[1]));
       setUserId(payload.sub);
     } catch (err) {
@@ -28,125 +51,192 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
-  const formatMessage = (msg) => {
+interface MessageInput {
+    senderId: string;
+    id?: string | number;
+    content?: string;
+    timestamp?: {
+        $numberLong?: string;
+    } | string | Date;
+}
+
+interface FormattedMessage {
+    _id: string;
+    text: string;
+    createdAt: Date;
+    user: {
+        _id: string;
+        name: string;
+    };
+}
+
+const formatMessage = (msg: MessageInput): FormattedMessage => {
     const isSelfMessage = msg.senderId === userId;
     const messageId = msg.id ? msg.id.toString() : generateTempId();
     
     return {
-      _id: messageId,
-      text: msg.content || '',
-      createdAt: msg.timestamp?.$numberLong 
-        ? new Date(parseInt(msg.timestamp.$numberLong))
-        : msg.timestamp 
-          ? new Date(msg.timestamp) 
-          : new Date(),
-      user: {
-        _id: isSelfMessage ? userId : msg.senderId,
-        name: isSelfMessage ? 'You' : friendName
-      }
+        _id: messageId,
+        text: msg.content || '',
+        createdAt: msg.timestamp 
+            ? typeof msg.timestamp === 'object' && '$numberLong' in msg.timestamp
+                ? new Date(parseInt(msg.timestamp.$numberLong!))
+                : msg.timestamp instanceof Date
+                    ? msg.timestamp
+                    : new Date(msg.timestamp as string)
+            : new Date(),
+        user: {
+            _id: isSelfMessage ? userId : msg.senderId,
+            name: isSelfMessage ? 'You' : friendName
+        }
     };
-  };
+};
 
   const loadMessages = async () => {
     try {
-      const res = await api.get('/messages', { params: { friendId } });
-      const formatted = res.data.map(formatMessage);
+      const res = await api.get<ApiResponse<Message[]>>('/messages', { 
+        params: { friendId } 
+      });
+      
+      // Debug log
+      console.log('Messages response:', JSON.stringify(res.data, null, 2));
+
+      if (!res.data?.data) {
+        console.error('Invalid response structure:', res.data);
+        return;
+      }
+
+      const formatted = res.data.data.map(formatMessage);
       setMessages(formatted.reverse());
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading messages:', err);
-      alert('Error loading messages: ' + (err.message || 'Unknown error'));
     }
   };
 
-  const handleSend = async (newMessages = []) => {
+  const handleSend = async (newMessages: IMessage[] = []): Promise<void> => {
     if (!newMessages.length) return;
     
     const m = newMessages[0];
     try {
-      const res = await api.post('/messages/send', {
+      const res = await api.post<ApiResponse<Message>>('/messages/send', {
         recipientId: friendId,
         content: m.text
       });
 
-      setMessages(GiftedChat.append(messages, formatMessage({
-        ...res.data,
-        senderId: userId,
-        id: generateTempId() // Use unique temp ID until server response
-      })));
-    } catch (err) {
+      if (userId) {
+        setMessages(prevMessages => 
+          GiftedChat.append(prevMessages, [formatMessage({
+            ...res.data.data,
+            senderId: userId,
+            id: generateTempId()
+          })])
+        );
+      }
+    } catch (err: any) {
       console.error('Error sending message:', err);
-      alert('Error sending message: ' + (err.message || 'Unknown error'));
     }
   };
 
   useEffect(() => {
-    getUserId();
-  }, []);
-
-  useEffect(() => {
-    if (userId) {
-      loadMessages();
+      getUserId();
+    }, []);
+  
+    useEffect(() => {
+      if (userId) {
+        // Initial load
+        loadMessages();
+        
+        // Set up polling every 3 seconds
+        const pollInterval = setInterval(loadMessages, 3000);
+        
+        // Cleanup on unmount
+        return () => clearInterval(pollInterval);
+      }
+    }, [userId]);
+  
+    interface MessageContextData {
+        actionSheet: () => void;
     }
-  }, [userId]);
 
-  const handleBubblePress = (context, message) => {
-    // Only show details for friend's messages
-    if (message.user._id !== userId) {
-      setSelectedUser({
-        name: friendName,
-        id: friendId,
-        email: route.params.friendEmail // Make sure to pass this in navigation params
-      });
-      setUserDetailsVisible(true);
-    }
-  };
+    const handleBubblePress = (context: MessageContextData, message: IMessage): void => {
+        // Only show details for friend's messages
+        if (message.user._id !== userId) {
+            setSelectedUser({
+                name: friendName,
+                id: friendId,
+                email: route.params.friendEmail // Make sure to pass this in navigation params
+            });
+            setUserDetailsVisible(true);
+        }
+    };
 
-  const renderBubble = props => (
+  // Add types to render functions
+  const renderBubble = (props: any) => (
     <Bubble
-      {...props}
-      wrapperStyle={{
-        right: styles.bubbleRight,
-        left: styles.bubbleLeft,
-      }}
-      textStyle={{
-        right: styles.bubbleTextRight,
-        left: styles.bubbleTextLeft,
-      }}
-      onPress={() => handleBubblePress(props, props.currentMessage)}
-    />
-  );
-
-  const renderInputToolbar = props => (
-    <InputToolbar
-      {...props}
-      containerStyle={styles.inputToolbar}
-      primaryStyle={styles.inputToolbarPrimary}
-    />
-  );
-
-  const renderComposer = props => (
-    <Composer
-      {...props}
-      textInputStyle={styles.composer}
-      placeholderTextColor={colors.mediumGray}
-      multiline={true}
-    />
-  );
-
-  const renderSend = props => (
-    <Send {...props} containerStyle={styles.sendContainer}>
-      <View style={[
-        styles.sendButton,
-        !props.text && styles.sendButtonDisabled
-      ]}>
-        <Ionicons 
-          name="send" 
-          size={20} 
-          color={props.text ? colors.white : colors.mediumGray} 
+          {...props}
+          wrapperStyle={{
+            right: styles.bubbleRight,
+            left: styles.bubbleLeft,
+          }}
+          textStyle={{
+            right: styles.bubbleTextRight,
+            left: styles.bubbleTextLeft,
+          }}
+          onPress={() => handleBubblePress(props, props.currentMessage)}
         />
-      </View>
-    </Send>
   );
+
+interface InputToolbarProps {
+    containerStyle?: any;
+    primaryStyle?: any;
+}
+
+const renderInputToolbar = (props: InputToolbarProps) => (
+    <InputToolbar
+        {...props}
+        containerStyle={styles.inputToolbar}
+        primaryStyle={styles.inputToolbarPrimary}
+    />
+);
+
+interface ComposerProps {
+    textInputStyle?: any;
+    placeholderTextColor?: string;
+    multiline?: boolean;
+}
+
+const renderComposer = (props: ComposerProps) => (
+    <Composer
+        {...props}
+        textInputStyle={styles.composer}
+        placeholderTextColor={colors.mediumGray}
+        multiline={true}
+    />
+);
+
+interface SendProps {
+    text?: string;
+    containerStyle?: any;
+    children?: React.ReactNode;
+}
+
+interface RenderSendProps extends SendProps {
+    text?: string;
+}
+
+const renderSend = (props: RenderSendProps) => (
+    <Send {...props} containerStyle={styles.sendContainer}>
+        <View style={[
+            styles.sendButton,
+            !props.text && styles.sendButtonDisabled
+        ]}>
+            <Ionicons 
+                name="send" 
+                size={20} 
+                color={props.text ? colors.white : colors.mediumGray} 
+            />
+        </View>
+    </Send>
+);
 
   return (
     <BackgroundLayout>
@@ -260,7 +350,7 @@ const styles = StyleSheet.create({
   },
   inputToolbar: {
     backgroundColor: colors.white,
-    borderTopColor: colors['heasy-gray-g2'],
+    borderTopColor: colors.lightGray,
     borderTopWidth: 1,
   },
   inputToolbarPrimary: {
@@ -341,3 +431,5 @@ const styles = StyleSheet.create({
     color: colors.darkGray,
   },
 });
+
+export default ChatScreen;

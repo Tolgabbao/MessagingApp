@@ -4,26 +4,32 @@ import { colors, typography, layouts } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
 import api from '../../services/api';
+import { NavigationProps, ApiResponse } from '../../types/global';
 
-export default function AddFriendScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+interface AddFriendResponse {
+  success: boolean;
+  message: string;
+}
 
-  const handleAddFriend = async () => {
+const AddFriendScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const [email, setEmail] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const handleAddFriend = async (): Promise<void> => {
     if (!email.trim()) return;
     
     try {
       setLoading(true);
-      await api.post('/friends/add', { email });
+      const response = await api.post<ApiResponse<AddFriendResponse>>('/friends/add', { email });
       navigation.goBack();
-      // You might want to show a success message
-    } catch (err) {
-      alert('Error: ' + err.message);
+    } catch (err: any) {
+      console.log('Error: ' + (err?.message || 'Unknown error occurred'));
     } finally {
       setLoading(false);
     }
   };
 
+  
   return (
     <BackgroundLayout>
       <View style={styles.container}>
@@ -96,8 +102,9 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   headerText: {
-    ...typography.header,
+    fontSize: typography.header.fontSize,
     color: colors.white,
+    fontWeight: 'bold',
   },
   content: {
     padding: 24,
@@ -161,3 +168,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
+export default AddFriendScreen;
