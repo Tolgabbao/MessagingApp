@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { colors, typography, layouts } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../../components/BackgroundLayout';
@@ -21,15 +21,40 @@ const AddFriendScreen: React.FC<NavigationProps> = ({ navigation }) => {
     try {
       setLoading(true);
       const response = await api.post<ApiResponse<AddFriendResponse>>('/friends/add', { email });
-      navigation.goBack();
+      
+      Alert.alert(
+        'Success',
+        'Friend request sent successfully',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      
     } catch (err: any) {
-      console.log('Error: ' + (err?.message || 'Unknown error occurred'));
+      // Access the error message from the correct path in the error response
+      const errorData = err.response?.data?.data || err.response?.data || err.message;
+      console.log('Add friend error details:', {
+        error: err,
+        response: err.response,
+        errorData
+      });
+      
+      if (typeof errorData === 'string') {
+        if (errorData.includes('already friends')) {
+          Alert.alert('Already Friends', 'You are already friends with this user');
+        } else if (errorData.includes('not found')) {
+          Alert.alert('User Not Found', 'No user found with this email address');
+        } else if (errorData.includes('pending')) {
+          Alert.alert('Pending Request', 'A friend request is already pending for this user');
+        } else {
+          Alert.alert('Error', errorData);
+        }
+      } else {
+        Alert.alert('Error', 'Failed to send friend request. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  
   return (
     <BackgroundLayout>
       <View style={styles.container}>

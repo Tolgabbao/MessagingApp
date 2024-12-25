@@ -21,6 +21,7 @@ interface LoginCredentials {
 
 interface LoginResponse {
   token: string;
+  message?: string;
 }
 
 interface LoginRequest {
@@ -48,35 +49,37 @@ export const login = async (
   password: string
 ): Promise<string> => {
   try {
+    // Validate email before sending request
+    if (!email.includes('@') || !email.includes('.')) {
+      throw new Error('Please enter a valid email address');
+    }
+
     const response = await api.post<ApiResponse<LoginResponse>>('/login', {
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
       password
     });
 
-    // Log the full response to debug
-    console.log('Login response:', JSON.stringify(response.data, null, 2));
-
-    // Check if we have a response and data property
-    if (!response.data) {
-      throw new Error('No response data received');
+    if (!response.data?.data?.token) {
+      throw new Error('Invalid login response: No token received');
     }
 
-    const token = response.data.data?.token;
-    
-    if (!token) {
-      throw new Error('No token in response');
-    }
-
-    // Store token
+    const token = response.data.data.token;
     await AsyncStorage.setItem('token', token);
     return token;
-  } catch (error: any) {
-    console.error('Login error details:', {
-      error: error,
-      response: error.response?.data,
-      status: error.response?.status
-    });
-    throw error;
+  } catch (err: any) {
+    // Handle specific error cases
+    const statusCode = err.response?.status;
+    const errorData = err.response?.data?.data || err.response?.data || err.message;
+
+    if (statusCode === 500 && errorData.includes('Validation failed')) {
+      throw new Error('Please enter a valid email address');
+    } else if (statusCode === 401) {
+      throw new Error('Invalid email or password');
+    } else if (typeof errorData === 'string' && errorData.toLowerCase().includes('email')) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    throw new Error(errorData || 'Login failed');
   }
 };
 

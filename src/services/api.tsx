@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse } from '../types/global';
 
 const instance: AxiosInstance = axios.create({
-  baseURL: 'http://10.51.55.179:8080',
+  baseURL: 'http://10.51.55.179:8080', // write your backend url here
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -53,7 +53,7 @@ instance.interceptors.response.use(
     };
   },
   (error) => {
-    console.error('API Error:', {
+    console.log('API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,

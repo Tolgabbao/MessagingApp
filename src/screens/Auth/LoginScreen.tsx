@@ -7,6 +7,7 @@ import { login } from '../../services/auth';
 import StyledTextInput from '../../components/StyledTextInput';
 import { NavigationProps, Theme } from '../../types/global';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isValidEmail } from '../../utils/validation';
 
 const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [email, setEmail] = useState<string>('');
@@ -14,27 +15,43 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) return;
+    // Validate inputs
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    if (!isValidEmail(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
     
     try {
       setLoading(true);
-      const token = await login(email.toLowerCase(), password);
-      console.log('Login successful, token received:', token ? 'Yes' : 'No');
+      const token = await login(email.toLowerCase().trim(), password);
       
       if (!token) {
-        throw new Error('No token received after login');
+        throw new Error('Login failed: No token received');
       }
 
-      // Verify token is stored
       const storedToken = await AsyncStorage.getItem('token');
       if (!storedToken) {
-        throw new Error('Token not stored properly');
+        throw new Error('Login failed: Token not stored');
       }
 
       navigation.replace('Home');
     } catch (err: any) {
-      console.error('Login error details:', err);
-      console.log('Login failed: ' + (err.message || 'Please try again'));
+      console.log('Login error:', err);
+      
+      // Handle specific error cases
+      const errorMessage = err.message?.toLowerCase() || '';
+      if (errorMessage.includes('email') && errorMessage.includes('Valid')) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address');
+      } else if (errorMessage.includes('invalid email or password')) {
+        Alert.alert('Login Failed', 'Incorrect email or password');
+      } else {
+        Alert.alert('Login Failed', err.message);
+      }
     } finally {
       setLoading(false);
     }
